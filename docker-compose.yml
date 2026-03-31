@@ -1,0 +1,56 @@
+version: "3.9"
+
+# docker-compose.yml — Run a paid API service with a Mainlayer sidecar.
+#
+# This pattern lets your application verify payments via the Mainlayer sidecar
+# without embedding payment logic directly in your service code.
+#
+# Usage:
+#   export MAINLAYER_API_KEY=your_key
+#   docker compose up
+
+services:
+  # ─────────────────────────────────────────────
+  # Your application service
+  # ─────────────────────────────────────────────
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Point your app at the Mainlayer sidecar for payment verification
+      MAINLAYER_SIDECAR_URL: "http://mainlayer-sidecar:3000"
+    depends_on:
+      mainlayer-sidecar:
+        condition: service_healthy
+    networks:
+      - app-net
+    restart: unless-stopped
+
+  # ─────────────────────────────────────────────
+  # Mainlayer sidecar — payment verification proxy
+  # ─────────────────────────────────────────────
+  mainlayer-sidecar:
+    image: mainlayer/mainlayer:latest
+    command: ["serve", "--port", "3000"]
+    environment:
+      MAINLAYER_API_KEY: "${MAINLAYER_API_KEY}"
+      MAINLAYER_BASE_URL: "${MAINLAYER_BASE_URL:-https://api.mainlayer.xyz}"
+      MAINLAYER_LOG_LEVEL: "${MAINLAYER_LOG_LEVEL:-info}"
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["/usr/local/bin/healthcheck.sh"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    networks:
+      - app-net
+    restart: unless-stopped
+    # Do not expose secrets via environment in production;
+    # use Docker secrets or a secrets manager instead.
+
+networks:
+  app-net:
+    driver: bridge

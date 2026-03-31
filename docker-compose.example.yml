@@ -1,0 +1,128 @@
+version: "3.9"
+
+# docker-compose.example.yml — Full-stack example with Mainlayer sidecar.
+#
+# Services:
+#   app              — Your API or web application
+#   mainlayer-verify — Mainlayer sidecar that verifies payment on every request
+#   redis            — Optional: shared cache for payment verification results
+#   nginx            — Reverse proxy that routes requests through the sidecar
+#
+# Usage:
+#   cp .env.example .env        # Fill in your MAINLAYER_API_KEY
+#   docker compose -f docker-compose.example.yml up
+
+services:
+  # ─────────────────────────────────────────────
+  # Application
+  # ─────────────────────────────────────────────
+  app:
+    image: your-org/your-app:latest
+    # build: .                  # Uncomment to build from local Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      # Mainlayer sidecar address — call this to verify incoming payments
+      MAINLAYER_SIDECAR_URL: "http://mainlayer-verify:3000"
+      # Optional: Redis connection for caching verification responses
+      REDIS_URL: "redis://redis:6379"
+    expose:
+      - "8080"
+    depends_on:
+      mainlayer-verify:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+
+  # ─────────────────────────────────────────────
+  # Mainlayer payment-verification sidecar
+  # ─────────────────────────────────────────────
+  mainlayer-verify:
+    image: mainlayer/mainlayer:latest
+    command: ["serve", "--port", "3000", "--cache-backend", "redis"]
+    environment:
+      MAINLAYER_API_KEY: "${MAINLAYER_API_KEY:?MAINLAYER_API_KEY is required}"
+      MAINLAYER_BASE_URL: "${MAINLAYER_BASE_URL:-https://api.mainlayer.xyz}"
+      MAINLAYER_LOG_LEVEL: "${MAINLAYER_LOG_LEVEL:-info}"
+      MAINLAYER_TIMEOUT: "${MAINLAYER_TIMEOUT:-30}"
+      # Redis cache for verified payment requests (avoids redundant API calls)
+      REDIS_URL: "redis://redis:6379"
+      # How long (seconds) to cache a verified payment result
+      MAINLAYER_CACHE_TTL: "300"
+    expose:
+      - "3000"
+    healthcheck:
+      test: ["/usr/local/bin/healthcheck.sh"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+
+  # ─────────────────────────────────────────────
+  # Redis — payment verification result cache
+  # ─────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --save "" --appendonly no --maxmemory 64mb --maxmemory-policy allkeys-lru
+    expose:
+      - "6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - internal
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+  # ─────────────────────────────────────────────
+  # Nginx — TLS termination and reverse proxy
+  # ─────────────────────────────────────────────
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/ssl:/etc/nginx/ssl:ro          # Mount your TLS certificates
+    depends_on:
+      - app
+    networks:
+      - internal
+      - external
+    restart: unless-stopped
+
+networks:
+  internal:
+    driver: bridge
+    internal: true       # No direct internet access from internal services
+  external:
+    driver: bridge       # Only nginx touches the outside world
+
+volumes:
+  redis-data:
