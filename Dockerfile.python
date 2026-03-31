@@ -1,52 +1,70 @@
-# Mainlayer CLI Docker Image — Python Variant
-# Based on the official mainlayer Python package.
+# Mainlayer Python SDK Docker Image
+# For Python apps that use the Mainlayer SDK for payment processing.
+# Includes Python 3.12 runtime and mainlayer library.
 #
 # Usage:
-#   docker build -f Dockerfile.python -t mainlayer/mainlayer:python .
-#   docker run --rm -e MAINLAYER_API_KEY=your_key mainlayer/mainlayer:python verify --request-id <id>
+#   docker run --rm -e MAINLAYER_API_KEY=ml_live_... -v $(pwd)/app.py:/app/app.py mainlayer-python python /app/app.py
+#   docker compose up (see examples/fastapi-with-mainlayer/)
+
+FROM python:3.12-slim as builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# ── Runtime Stage ────────────────────────────────────────────────────────────
 
 FROM python:3.12-slim
 
-LABEL org.opencontainers.image.title="Mainlayer (Python)"
-LABEL org.opencontainers.image.description="Official Mainlayer CLI image (Python variant) — Stripe for AI agents"
-LABEL org.opencontainers.image.url="https://mainlayer.xyz"
-LABEL org.opencontainers.image.documentation="https://docs.mainlayer.xyz"
+# OCI Labels
+LABEL org.opencontainers.image.title="Mainlayer Python SDK"
+LABEL org.opencontainers.image.description="Payment infrastructure for AI agents (Python)"
+LABEL org.opencontainers.image.url="https://mainlayer.fr"
+LABEL org.opencontainers.image.documentation="https://docs.mainlayer.fr"
 LABEL org.opencontainers.image.source="https://github.com/mainlayer/mainlayer-docker"
 LABEL org.opencontainers.image.vendor="Mainlayer"
 LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.version="1.0.0"
 
-# Install system dependencies
+# Install minimal runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     jq \
-    tini \
     ca-certificates \
+    tini \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade pip and install the Mainlayer Python package
-RUN pip install --no-cache-dir --upgrade pip && \
+# Upgrade pip and install Mainlayer SDK
+RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir mainlayer
 
-# Copy helper scripts into PATH
+# Copy helper scripts
 COPY scripts/ /usr/local/bin/
 RUN chmod +x /usr/local/bin/mainlayer-entrypoint.sh \
-             /usr/local/bin/healthcheck.sh \
-             /usr/local/bin/setup.sh
+             /usr/local/bin/healthcheck.sh
 
-# Create a non-root user
+# Create non-root user
 RUN groupadd -r mainlayer && useradd -r -g mainlayer mainlayer
 
-# Runtime environment variables
-ENV MAINLAYER_API_KEY=""
-ENV MAINLAYER_BASE_URL="https://api.mainlayer.xyz"
-ENV MAINLAYER_LOG_LEVEL="info"
-ENV MAINLAYER_TIMEOUT="30"
+# Set working directory
+WORKDIR /app
 
-# Health check
+# ── Environment Configuration ────────────────────────────────────────────────
+ENV MAINLAYER_API_KEY="" \
+    MAINLAYER_BASE_URL="https://api.mainlayer.fr" \
+    MAINLAYER_LOG_LEVEL="info" \
+    MAINLAYER_TIMEOUT="30" \
+    MAINLAYER_SKIP_VERIFY="false" \
+    PYTHONUNBUFFERED="1" \
+    PYTHONDONTWRITEBYTECODE="1"
+
+# ── Health Check ─────────────────────────────────────────────────────────────
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD ["/usr/local/bin/healthcheck.sh"]
 
-# Use tini as PID 1
+# ── Signal Handling ──────────────────────────────────────────────────────────
 ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/mainlayer-entrypoint.sh"]
 
+# Default: show help
 CMD ["--help"]
