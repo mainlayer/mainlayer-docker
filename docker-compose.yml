@@ -35,7 +35,7 @@ services:
     command: ["serve", "--port", "3000"]
     environment:
       MAINLAYER_API_KEY: "${MAINLAYER_API_KEY}"
-      MAINLAYER_BASE_URL: "${MAINLAYER_BASE_URL:-https://api.mainlayer.xyz}"
+      MAINLAYER_BASE_URL: "${MAINLAYER_BASE_URL:-https://api.mainlayer.fr}"
       MAINLAYER_LOG_LEVEL: "${MAINLAYER_LOG_LEVEL:-info}"
     ports:
       - "3000:3000"

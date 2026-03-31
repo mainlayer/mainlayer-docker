@@ -24,7 +24,7 @@ services:
     command: ["serve", "--port", "3000"]
     environment:
       MAINLAYER_API_KEY: "${MAINLAYER_API_KEY:?Set MAINLAYER_API_KEY}"
-      MAINLAYER_BASE_URL: "${MAINLAYER_BASE_URL:-https://api.mainlayer.xyz}"
+      MAINLAYER_BASE_URL: "${MAINLAYER_BASE_URL:-https://api.mainlayer.fr}"
     expose:
       - "3000"
     healthcheck:

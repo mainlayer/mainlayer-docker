@@ -1,6 +1,6 @@
 # Mainlayer Docker
 
-Official Docker images for [Mainlayer](https://mainlayer.xyz) — payment infrastructure for apps and AI agents.
+Official Docker images for [Mainlayer](https://mainlayer.fr) — payment infrastructure for apps and AI agents.
 
 ## Images
 
@@ -42,7 +42,7 @@ docker run --rm \
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `MAINLAYER_API_KEY` | *(required)* | Your Mainlayer API key |
-| `MAINLAYER_BASE_URL` | `https://api.mainlayer.xyz` | API base URL (override for staging) |
+| `MAINLAYER_BASE_URL` | `https://api.mainlayer.fr` | API base URL (override for staging) |
 | `MAINLAYER_LOG_LEVEL` | `info` | Log verbosity: `debug`, `info`, `warn`, `error` |
 | `MAINLAYER_TIMEOUT` | `30` | Request timeout in seconds |
 
@@ -97,6 +97,6 @@ docker build -f Dockerfile.python -t mainlayer/mainlayer-python:local .
 
 ## Links
 
-- [Mainlayer Documentation](https://docs.mainlayer.xyz)
-- [Mainlayer Dashboard](https://app.mainlayer.xyz)
+- [Mainlayer Documentation](https://docs.mainlayer.fr)
+- [Mainlayer Dashboard](https://app.mainlayer.fr)
 - [Docker Hub](https://hub.docker.com/r/mainlayer/mainlayer)
